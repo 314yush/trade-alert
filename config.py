@@ -12,11 +12,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # =============================================================================
-# TELEGRAM BOT CONFIGURATION
+# TELEGRAM CONFIGURATION
 # =============================================================================
-# Get Telegram bot token from environment variable or set directly
-TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', 'YOUR_TELEGRAM_BOT_TOKEN_HERE')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', 'YOUR_TELEGRAM_CHAT_ID_HERE')
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')  # Load from .env
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '')      # Load from .env
+
+# Enable/disable Telegram alerts
+TELEGRAM_ENABLED = True  # Set to False to disable Telegram
+
+# Telegram message settings
+TELEGRAM_PARSE_MODE = 'HTML'  # HTML, Markdown, or None
+TELEGRAM_DISABLE_WEB_PAGE_PREVIEW = True
+TELEGRAM_DISABLE_NOTIFICATION = False
 
 # =============================================================================
 # EXCHANGE CONFIGURATION
@@ -201,6 +209,9 @@ BACKTEST_CONFIG = {
 # =============================================================================
 # Console Output Configuration
 CONSOLE_ALERTS_ENABLED = True  # Always enabled for local monitoring
+
+# Telegram Alerts Configuration
+TELEGRAM_ALERTS_ENABLED = TELEGRAM_ENABLED and bool(TELEGRAM_BOT_TOKEN) and bool(TELEGRAM_CHAT_ID)
 
 # Maximum number of alerts per day per strategy to prevent spam
 MAX_ALERTS_PER_DAY = 10

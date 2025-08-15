@@ -20,9 +20,10 @@ from apscheduler.triggers.cron import CronTrigger
 from config import (
     ENABLED_PROFILES, SCHEDULE_INTERVALS, TRADING_PAIRS, DEFAULT_PAIR,
     LOG_LEVEL, LOG_FILE, DEBUG_MODE, DRY_RUN_MODE, CAPITAL_ALLOCATION,
-    CONSOLE_ALERTS_ENABLED
+    CONSOLE_ALERTS_ENABLED, TELEGRAM_ALERTS_ENABLED
 )
 from strategy_manager import StrategyManager
+from telegram_bot import TelegramBot
 
 # Configure logging
 logging.basicConfig(
@@ -76,6 +77,18 @@ class EnhancedTradingAlertBot:
             # Initialize enhanced strategy engine
             self.strategy_engine = StrategyManager()
             logger.info("Strategy manager initialized")
+            
+            # Initialize Telegram bot if enabled
+            if TELEGRAM_ALERTS_ENABLED:
+                self.telegram_bot = TelegramBot()
+                if self.telegram_bot.is_initialized:
+                    logger.info("Telegram bot initialized successfully")
+                else:
+                    logger.warning("Telegram bot initialization failed, continuing without Telegram")
+                    self.telegram_bot = None
+            else:
+                self.telegram_bot = None
+                logger.info("Telegram bot disabled")
             
             # Initialize scheduler
             self.scheduler = BackgroundScheduler()
@@ -247,27 +260,28 @@ class EnhancedTradingAlertBot:
                        f"at ${signal['price']:.2f} using {signal['strategy']}")
             
             # Send Telegram alert or console output
-            # if self.telegram_bot:
-            #     try:
-            #         # Format the enhanced alert message
-            #         alert_message = self._format_enhanced_alert(signal)
+            if TELEGRAM_ALERTS_ENABLED:
+                try:
+                    # Format the enhanced alert message
+                    alert_message = self._format_enhanced_alert(signal)
                     
-            #         # Send the alert
-            #         if self.telegram_bot.send_message(alert_message):
-            #             logger.info(f"Alert sent successfully for {signal['symbol']}")
-            #         else:
-            #             logger.error(f"Failed to send alert for {signal['symbol']}")
+                    # Send the alert
+                    if self.telegram_bot:
+                        if self.telegram_bot.send_message(alert_message):
+                            logger.info(f"Alert sent successfully for {signal['symbol']}")
+                        else:
+                            logger.error(f"Failed to send alert for {signal['symbol']}")
                         
-            #     except Exception as e:
-            #         logger.error(f"Error sending Telegram alert: {e}")
-            #         self.stats['errors_count'] += 1
-            # else:
+                except Exception as e:
+                    logger.error(f"Error sending Telegram alert: {e}")
+                    self.stats['errors_count'] += 1
+            else:
                 # Console output for test mode
-            console_message = self._format_console_alert(signal)
-            print(f"\n{'='*60}")
-            print(console_message)
-            print(f"{'='*60}\n")
-            logger.info(f"Console alert displayed for {signal['symbol']}")
+                console_message = self._format_console_alert(signal)
+                print(f"\n{'='*60}")
+                print(console_message)
+                print(f"{'='*60}\n")
+                logger.info(f"Console alert displayed for {signal['symbol']}")
             
             # Signal processed successfully
             
@@ -373,25 +387,26 @@ class EnhancedTradingAlertBot:
             summary += f"\nErrors: {self.stats['errors_count']}\n"
             
             # Send summary via Telegram or console
-            # if self.telegram_bot:
-            #     telegram_summary = f"📊 <b>DAILY TRADING SUMMARY</b>\n\n"
-            #     telegram_summary += f"<b>Date:</b> {today.strftime('%Y-%m-%d')}\n"
-            #     telegram_summary += f"<b>Total Signals:</b> {daily_signals}\n\n"
-                
-            #     telegram_summary += "<b>Signals by Strategy:</b>\n"
-            #     for strategy, count in self.stats['signals_by_strategy'].items():
-            #         strategy_name = strategy.replace('_', ' ').title()
-            #         telegram_summary += f"  {strategy_name}: {count}\n"
-                
-            #     telegram_summary += f"\n<b>Errors:</b> {self.stats['errors_count']}\n"
-                
-            #     self.telegram_bot.send_message(telegram_summary)
-            #     logger.info("Daily summary sent via Telegram")
-            # else:
-            print(f"\n{'='*60}")
-            print(summary)
-            print(f"{'='*60}\n")
-            logger.info("Daily summary displayed in console")
+            if TELEGRAM_ALERTS_ENABLED:
+                if self.telegram_bot:
+                    telegram_summary = f"📊 <b>DAILY TRADING SUMMARY</b>\n\n"
+                    telegram_summary += f"<b>Date:</b> {today.strftime('%Y-%m-%d')}\n"
+                    telegram_summary += f"<b>Total Signals:</b> {daily_signals}\n\n"
+                    
+                    telegram_summary += "<b>Signals by Strategy:</b>\n"
+                    for strategy, count in self.stats['signals_by_strategy'].items():
+                        strategy_name = strategy.replace('_', ' ').title()
+                        telegram_summary += f"  {strategy_name}: {count}\n"
+                    
+                    telegram_summary += f"\n<b>Errors:</b> {self.stats['errors_count']}\n"
+                    
+                    self.telegram_bot.send_message(telegram_summary)
+                    logger.info("Daily summary sent via Telegram")
+            else:
+                print(f"\n{'='*60}")
+                print(summary)
+                print(f"{'='*60}\n")
+                logger.info("Daily summary displayed in console")
             
         except Exception as e:
             logger.error(f"Error sending daily summary: {e}")
@@ -415,21 +430,22 @@ class EnhancedTradingAlertBot:
             health_msg += f"Last Signal: {self.stats['last_signal_time'] or 'None'}\n"
             
             # Send health check via Telegram or console
-            # if self.telegram_bot:
-            #     telegram_health = f"🏥 <b>BOT HEALTH CHECK</b>\n\n"
-            #     telegram_health += f"<b>Status:</b> {'🟢 RUNNING' if self.is_running else '🔴 STOPPED'}\n"
-            #     telegram_health += f"<b>Uptime:</b> {uptime_str}\n"
-            #     telegram_health += f"<b>Total Signals:</b> {self.stats['total_signals']}\n"
-            #     telegram_health += f"<b>Errors:</b> {self.stats['errors_count']}\n"
-            #     telegram_health += f"<b>Last Signal:</b> {self.stats['last_signal_time'] or 'None'}\n"
-                
-            #     self.telegram_bot.send_message(telegram_health)
-            #     logger.info("Health check sent via Telegram")
-            # else:
-            print(f"\n{'='*60}")
-            print(health_msg)
-            print(f"{'='*60}\n")
-            logger.info("Health check displayed in console")
+            if TELEGRAM_ALERTS_ENABLED:
+                if self.telegram_bot:
+                    telegram_health = f"🏥 <b>BOT HEALTH CHECK</b>\n\n"
+                    telegram_health += f"<b>Status:</b> {'🟢 RUNNING' if self.is_running else '🔴 STOPPED'}\n"
+                    telegram_health += f"<b>Uptime:</b> {uptime_str}\n"
+                    telegram_health += f"<b>Total Signals:</b> {self.stats['total_signals']}\n"
+                    telegram_health += f"<b>Errors:</b> {self.stats['errors_count']}\n"
+                    telegram_health += f"<b>Last Signal:</b> {self.stats['last_signal_time'] or 'None'}\n"
+                    
+                    self.telegram_bot.send_message(telegram_health)
+                    logger.info("Health check sent via Telegram")
+            else:
+                print(f"\n{'='*60}")
+                print(health_msg)
+                print(f"{'='*60}\n")
+                logger.info("Health check displayed in console")
             
         except Exception as e:
             logger.error(f"Error in health check: {e}")
@@ -455,23 +471,24 @@ class EnhancedTradingAlertBot:
             status_msg += f"Time: {datetime.now().strftime('%H:%M:%S UTC')}"
             
             # Send status via Telegram or console
-            # if self.telegram_bot:
-            #     telegram_status = f"⏰ <b>MINUTE STATUS UPDATE</b>\n\n"
-            #     telegram_status += f"<b>Status:</b> {'🟢 RUNNING' if self.is_running else '🔴 STOPPED'}\n"
-            #     telegram_status += f"<b>Uptime:</b> {uptime_str}\n"
-            #     telegram_status += f"<b>Total Signals:</b> {self.stats['total_signals']}\n"
-            #     telegram_status += f"<b>Errors:</b> {self.stats['errors_count']}\n"
-            #     telegram_status += f"<b>Last Signal:</b> {self.stats['last_signal_time'] or 'None'}\n"
-            #     telegram_status += f"<b>Active Jobs:</b> {len(self.scheduler.get_jobs()) if self.scheduler else 0}\n"
-            #     telegram_status += f"<b>Time:</b> {datetime.now().strftime('%H:%M:%S UTC')}"
-                
-            #     self.telegram_bot.send_message(telegram_status)
-            #     logger.debug("Minute status update sent via Telegram")
-            # else:
-            print(f"\n{'='*60}")
-            print(status_msg)
-            print(f"{'='*60}\n")
-            logger.debug("Minute status update displayed in console")
+            if TELEGRAM_ALERTS_ENABLED:
+                if self.telegram_bot:
+                    telegram_status = f"⏰ <b>MINUTE STATUS UPDATE</b>\n\n"
+                    telegram_status += f"<b>Status:</b> {'🟢 RUNNING' if self.is_running else '🔴 STOPPED'}\n"
+                    telegram_status += f"<b>Uptime:</b> {uptime_str}\n"
+                    telegram_status += f"<b>Total Signals:</b> {self.stats['total_signals']}\n"
+                    telegram_status += f"<b>Errors:</b> {self.stats['errors_count']}\n"
+                    telegram_status += f"<b>Last Signal:</b> {self.stats['last_signal_time'] or 'None'}\n"
+                    telegram_status += f"<b>Active Jobs:</b> {len(self.scheduler.get_jobs()) if self.scheduler else 0}\n"
+                    telegram_status += f"<b>Time:</b> {datetime.now().strftime('%H:%M:%S UTC')}"
+                    
+                    self.telegram_bot.send_message(telegram_status)
+                    logger.debug("Minute status update sent via Telegram")
+            else:
+                print(f"\n{'='*60}")
+                print(status_msg)
+                print(f"{'='*60}\n")
+                logger.debug("Minute status update displayed in console")
             
         except Exception as e:
             logger.error(f"Error in minute status update: {e}")
@@ -485,10 +502,9 @@ class EnhancedTradingAlertBot:
             
             logger.info("Starting Enhanced Trading Alert Bot...")
             
-            # Start scheduler
-            if self.scheduler:
-                self.scheduler.start()
-                logger.info("Scheduler started")
+            # Start the scheduler
+            self.scheduler.start()
+            logger.info("Scheduler started")
             
             # Send startup notification
             startup_msg = "🚀 ENHANCED TRADING BOT STARTED\n\n"
@@ -498,30 +514,49 @@ class EnhancedTradingAlertBot:
             startup_msg += "• 🛡️ Conservative Trend Rider (4h)\n\n"
             startup_msg += "Risk management and position sizing are active.\n"
             startup_msg += f"Monitoring {len(TRADING_PAIRS)} trading pairs.\n\n"
-            startup_msg += "💻 CONSOLE ALERTS: ENABLED\n"
-            startup_msg += "⏰ MINUTE STATUS UPDATES: ACTIVE (for testing)\n"
-            startup_msg += "🔒 DRY RUN MODE: ENABLED (safe testing)\n"
+            
+            if TELEGRAM_ALERTS_ENABLED:
+                startup_msg += "📱 <b>TELEGRAM ALERTS: ENABLED</b>\n"
+            else:
+                startup_msg += "📱 <b>TELEGRAM ALERTS: DISABLED</b>\n"
+                
+            if CONSOLE_ALERTS_ENABLED:
+                startup_msg += "💻 CONSOLE ALERTS: ENABLED\n"
+            else:
+                startup_msg += "💻 CONSOLE ALERTS: DISABLED\n"
+                
+            if DEBUG_MODE:
+                startup_msg += "�� DEBUG MODE: ENABLED (for testing)\n"
+            else:
+                startup_msg += "🔍 DEBUG MODE: DISABLED\n"
+                
+            if DRY_RUN_MODE:
+                startup_msg += "🔒 DRY RUN MODE: ENABLED (safe testing)\n"
+            else:
+                startup_msg += "🔒 DRY RUN MODE: DISABLED\n"
+                
             startup_msg += "📊 CLEAN & SIMPLE: No external dependencies"
             
-            # if self.telegram_bot:
-            #     telegram_startup = "🚀 <b>ENHANCED TRADING BOT STARTED</b>\n\n"
-            #     telegram_startup += "The bot is now running with enhanced strategies:\n"
-            #     telegram_startup += "• 🚨 Aggressive Momentum Ignition (5m)\n"
-            #     telegram_startup += "• ⚖️ Moderate EMA Crossover (15m)\n"
-            #     telegram_startup += "• 🛡️ Conservative Trend Rider (4h)\n\n"
-            #     telegram_startup += "Risk management and position sizing are active.\n"
-            #     telegram_startup += f"Monitoring {len(TRADING_PAIRS)} trading pairs.\n\n"
-            #     telegram_startup += "📱 <b>TELEGRAM ALERTS: ENABLED</b>\n"
-            #     telegram_startup += "⏰ <b>MINUTE STATUS UPDATES: ACTIVE</b> (for testing)\n"
-            #     telegram_startup += "🔒 <b>DRY RUN MODE: ENABLED</b> (safe testing)"
-                
-            #     self.telegram_bot.send_message(telegram_startup)
-            #     logger.info("Startup notification sent via Telegram")
-            # else:
-            print(f"\n{'='*60}")
-            print(startup_msg)
-            print(f"{'='*60}\n")
-            logger.info("Startup notification displayed in console")
+            if TELEGRAM_ALERTS_ENABLED:
+                if self.telegram_bot:
+                    telegram_startup = "🚀 <b>ENHANCED TRADING BOT STARTED</b>\n\n"
+                    telegram_startup += "The bot is now running with enhanced strategies:\n"
+                    telegram_startup += "• 🚨 Aggressive Momentum Ignition (5m)\n"
+                    telegram_startup += "• ⚖️ Moderate EMA Crossover (15m)\n"
+                    telegram_startup += "• 🛡️ Conservative Trend Rider (4h)\n\n"
+                    telegram_startup += "Risk management and position sizing are active.\n"
+                    telegram_startup += f"Monitoring {len(TRADING_PAIRS)} trading pairs.\n\n"
+                    telegram_startup += "📱 <b>TELEGRAM ALERTS: ENABLED</b>\n"
+                    telegram_startup += "⏰ <b>MINUTE STATUS UPDATES: ACTIVE</b> (for testing)\n"
+                    telegram_startup += "🔒 <b>DRY RUN MODE: ENABLED</b> (safe testing)"
+                    
+                    self.telegram_bot.send_message(telegram_startup)
+                    logger.info("Startup notification sent via Telegram")
+            else:
+                print(f"\n{'='*60}")
+                print(startup_msg)
+                print(f"{'='*60}\n")
+                logger.info("Startup notification displayed in console")
             
             self.is_running = True
             self.start_time = datetime.now()
@@ -548,7 +583,12 @@ class EnhancedTradingAlertBot:
                 logger.info("Strategy engine cleaned up")
             
             # Send final status
-            if CONSOLE_ALERTS_ENABLED:
+            if TELEGRAM_ALERTS_ENABLED:
+                if self.telegram_bot:
+                    self.telegram_bot.send_message("🛑 ENHANCED TRADING BOT STOPPED\n\n"
+                                                   "The bot has been shut down gracefully.")
+                    logger.info("Final status sent via Telegram")
+            else:
                 self._format_console_alert({
                     'profile': 'Bot Status',
                     'signal_type': 'info',
@@ -586,6 +626,15 @@ class EnhancedTradingAlertBot:
             'stats': self.stats.copy(),
             'scheduler_running': self.scheduler.running if self.scheduler else False
         }
+    
+    def get_uptime(self) -> str:
+        """Get bot uptime as a formatted string."""
+        if self.start_time:
+            uptime = datetime.now() - self.start_time
+            hours, remainder = divmod(int(uptime.total_seconds()), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        return "00:00:00"
 
 
 def main():
