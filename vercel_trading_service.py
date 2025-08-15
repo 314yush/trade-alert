@@ -47,6 +47,8 @@ class VercelTradingBot:
         self.start_time = None
         self.total_signals = 0
         self.errors_count = 0
+        self.signals_history = []  # Store trading signals
+        self.max_signals_stored = 100  # Keep last 100 signals
         
     def start(self):
         """Start the trading bot."""
@@ -105,6 +107,45 @@ class VercelTradingBot:
             'current_time': datetime.now().isoformat()
         }
     
+    def get_signals(self, limit: int = 10):
+        """Get the latest trading signals."""
+        try:
+            # Return the most recent signals (up to the limit)
+            recent_signals = self.signals_history[-limit:] if self.signals_history else []
+            
+            return {
+                'total_signals': self.total_signals,
+                'signals_returned': len(recent_signals),
+                'requested_limit': limit,
+                'signals': recent_signals,
+                'timestamp': datetime.now().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"Error getting signals: {e}")
+            return {
+                'error': f"Error retrieving signals: {str(e)}",
+                'timestamp': datetime.now().isoformat()
+            }
+    
+    def _add_signal_to_history(self, signal: dict):
+        """Add a new signal to the history."""
+        try:
+            # Add timestamp if not present
+            if 'timestamp' not in signal:
+                signal['timestamp'] = datetime.now().isoformat()
+            
+            # Add to history
+            self.signals_history.append(signal)
+            
+            # Keep only the last max_signals_stored signals
+            if len(self.signals_history) > self.max_signals_stored:
+                self.signals_history = self.signals_history[-self.max_signals_stored:]
+                
+            logger.info(f"Added signal to history: {signal.get('type', 'UNKNOWN')} {signal.get('symbol', 'UNKNOWN')}")
+            
+        except Exception as e:
+            logger.error(f"Error adding signal to history: {e}")
+    
     def _start_trading_logic(self):
         """Start the trading logic in a background thread."""
         def trading_loop():
@@ -144,8 +185,17 @@ class VercelTradingBot:
                 'price': 45000 + (self.total_signals * 100),
                 'timestamp': datetime.now().isoformat(),
                 'confidence': 0.85,
-                'reason': 'Momentum breakout detected'
+                'reason': 'Momentum breakout detected',
+                'strategy': 'Aggressive Momentum Ignition',
+                'timeframe': '5m',
+                'stop_loss': 45000 + (self.total_signals * 100) * 0.992,
+                'take_profit': 45000 + (self.total_signals * 100) * 1.015,
+                'leverage': 3,
+                'risk_level': 'HIGH' if self.total_signals % 2 == 0 else 'MEDIUM'
             }
+            
+            # Add to signal history
+            self._add_signal_to_history(signal)
             
             # Send via Telegram
             self._send_telegram_signal(signal)
@@ -248,6 +298,7 @@ def home():
             'health': '/health',
             'home': '/',
             'status': '/status',
+            'signals': '/signals',
             'start': '/start',
             'stop': '/stop',
             'test': '/test'
@@ -276,6 +327,28 @@ def health_check():
 def status():
     """Bot status endpoint."""
     return jsonify(trading_bot.get_status())
+
+@app.route('/signals')
+def get_signals():
+    """Get the latest trading signals."""
+    try:
+        # Get limit from query parameter, default to 10
+        limit = request.args.get('limit', 10, type=int)
+        
+        # Validate limit (max 50 signals)
+        if limit > 50:
+            limit = 50
+        elif limit < 1:
+            limit = 1
+        
+        return jsonify(trading_bot.get_signals(limit=limit))
+        
+    except Exception as e:
+        logger.error(f"Error in /signals endpoint: {e}")
+        return jsonify({
+            'error': f"Error retrieving signals: {str(e)}",
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 @app.route('/start')
 def start_bot():
@@ -383,6 +456,7 @@ if __name__ == '__main__':
     logger.info("  - / (home)")
     logger.info("  - /health (health check)")
     logger.info("  - /status (bot status)")
+    logger.info("  - /signals (get trading signals)")
     logger.info("  - /start (start bot)")
     logger.info("  - /stop (stop bot)")
     logger.info("  - /test (test endpoint)")
