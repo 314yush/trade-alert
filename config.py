@@ -118,7 +118,7 @@ CONSERVATIVE_TREND_RIDER = {
     'parameters': {
         'ema_fast': 50,             # Kept same
         'ema_slow': 200,            # Kept same
-        'adx_threshold': 25,        # Kept same
+        'adx_threshold': 14,        # Changed from 25 to 14 to match data handler
         'rsi_length': 14,           # Kept same
         'rsi_upper': 60,            # Kept same
         'rsi_lower': 40,            # Kept same

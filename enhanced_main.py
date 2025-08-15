@@ -22,7 +22,7 @@ from config import (
     LOG_LEVEL, LOG_FILE, DEBUG_MODE, DRY_RUN_MODE, CAPITAL_ALLOCATION,
     CONSOLE_ALERTS_ENABLED
 )
-from enhanced_strategy_engine import EnhancedStrategyEngine
+from strategy_manager import StrategyManager
 
 # Configure logging
 logging.basicConfig(
@@ -71,34 +71,21 @@ class EnhancedTradingAlertBot:
         logger.info("EnhancedTradingAlertBot initialized successfully")
     
     def _initialize_components(self) -> None:
-        """Initialize all bot components."""
+        """Initialize bot components."""
         try:
             # Initialize enhanced strategy engine
-            self.strategy_engine = EnhancedStrategyEngine()
-            logger.info("Enhanced strategy engine initialized")
+            self.strategy_engine = StrategyManager()
+            logger.info("Strategy manager initialized")
             
-            # Initialize Telegram bot only if not in test mode
-            # if not (TEST_MODE and SKIP_TELEGRAM_IN_TEST):
-            #     try:
-            #         self.telegram_bot = TelegramBot()
-            #         logger.info("Telegram bot initialized")
-                    
-            #         # Test Telegram connection (non-blocking)
-            #         if self.telegram_bot.test_connection():
-            #             logger.info("Telegram bot connection test completed")
-            #         else:
-            #             logger.warning("Telegram bot connection test failed, but continuing...")
-                        
-            #     except Exception as e:
-            #         logger.warning(f"Telegram bot initialization failed: {e}")
-            #         logger.info("Continuing in console-only mode")
-            #         self.telegram_bot = None
-            # else:
-            #     logger.info("Running in test mode - Telegram bot skipped")
-            #     self.telegram_bot = None
+            # Initialize scheduler
+            self.scheduler = BackgroundScheduler()
+            self._setup_scheduler()
+            logger.info("Scheduler initialized")
+            
+            logger.info("All components initialized successfully")
             
         except Exception as e:
-            logger.error(f"Failed to initialize components: {e}")
+            logger.error(f"Error initializing components: {e}")
             raise
     
     def _setup_scheduler(self) -> None:
@@ -197,7 +184,7 @@ class EnhancedTradingAlertBot:
             
             for pair in TRADING_PAIRS:
                 try:
-                    signal = self.strategy_engine.check_aggressive_momentum_ignition(pair)
+                    signal = self.strategy_engine.check_strategy('aggressive_momentum_ignition', pair)
                     if signal:
                         self._process_trading_signal(signal)
                 except Exception as e:
@@ -215,7 +202,7 @@ class EnhancedTradingAlertBot:
             
             for pair in TRADING_PAIRS:
                 try:
-                    signal = self.strategy_engine.check_moderate_ema_crossover(pair)
+                    signal = self.strategy_engine.check_strategy('moderate_ema_crossover', pair)
                     if signal:
                         self._process_trading_signal(signal)
                 except Exception as e:
@@ -233,7 +220,7 @@ class EnhancedTradingAlertBot:
             
             for pair in TRADING_PAIRS:
                 try:
-                    signal = self.strategy_engine.check_conservative_trend_rider(pair)
+                    signal = self.strategy_engine.check_strategy('conservative_trend_rider', pair)
                     if signal:
                         self._process_trading_signal(signal)
                 except Exception as e:
@@ -546,56 +533,45 @@ class EnhancedTradingAlertBot:
             raise
     
     def stop(self) -> None:
-        """Stop the enhanced trading alert bot."""
+        """Stop the trading bot."""
         try:
-            if not self.is_running:
-                logger.warning("Bot is not running")
-                return
+            logger.info("Stopping enhanced trading bot...")
             
-            logger.info("Stopping Enhanced Trading Alert Bot...")
-            
-            # Stop scheduler
+            # Stop the scheduler
             if self.scheduler:
                 self.scheduler.shutdown()
                 logger.info("Scheduler stopped")
             
-            # Send shutdown notification
-            shutdown_msg = "🛑 ENHANCED TRADING BOT STOPPED\n\n"
-            shutdown_msg += "Bot has been shut down gracefully.\n"
-            shutdown_msg += f"Total signals generated: {self.stats['total_signals']}"
+            # Cleanup strategy engine
+            if hasattr(self, 'strategy_engine'):
+                self.strategy_engine.cleanup()
+                logger.info("Strategy engine cleaned up")
             
-            # if self.telegram_bot:
-            #     telegram_shutdown = "🛑 <b>ENHANCED TRADING BOT STOPPED</b>\n\n"
-            #     telegram_shutdown += "Bot has been shut down gracefully.\n"
-            #     telegram_shutdown += f"Total signals generated: {self.stats['total_signals']}"
-                
-            #     self.telegram_bot.send_message(telegram_shutdown)
-            #     logger.info("Shutdown notification sent via Telegram")
-            # else:
-            print(f"\n{'='*60}")
-            print(shutdown_msg)
-            print(f"{'='*60}\n")
-            logger.info("Shutdown notification displayed in console")
+            # Send final status
+            if CONSOLE_ALERTS_ENABLED:
+                self._format_console_alert({
+                    'profile': 'Bot Status',
+                    'signal_type': 'info',
+                    'symbol': 'SYSTEM',
+                    'price': 0,
+                    'stop_loss': 0,
+                    'take_profit': 0,
+                    'timeframe': 'N/A',
+                    'timestamp': datetime.now()
+                })
             
-            self.is_running = False
-            
-            # Cleanup
-            self._cleanup()
-            
-            logger.info("Enhanced Trading Alert Bot stopped successfully")
+            logger.info("Enhanced trading bot stopped successfully")
             
         except Exception as e:
-            logger.error(f"Failed to stop bot: {e}")
+            logger.error(f"Error stopping bot: {e}")
     
     def _cleanup(self) -> None:
-        """Clean up resources."""
+        """Cleanup resources."""
         try:
-            if self.strategy_engine:
+            # Cleanup strategy engine
+            if hasattr(self, 'strategy_engine'):
                 self.strategy_engine.cleanup()
             
-            # if self.telegram_bot:
-            #     self.telegram_bot.cleanup()
-                
             logger.info("Cleanup completed")
             
         except Exception as e:
