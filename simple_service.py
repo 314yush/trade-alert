@@ -78,8 +78,11 @@ def test():
         'status': 'success'
     })
 
+# Vercel requires this for serverless deployment
+app.debug = False
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))  # Render default port
+    port = int(os.environ.get('PORT', 8080))
     logger.info(f"Starting simple service on port {port}")
     logger.info("Available endpoints:")
     logger.info("  - / (home)")
