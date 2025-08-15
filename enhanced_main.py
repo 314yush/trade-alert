@@ -20,7 +20,7 @@ from apscheduler.triggers.cron import CronTrigger
 from config import (
     ENABLED_PROFILES, SCHEDULE_INTERVALS, TRADING_PAIRS, DEFAULT_PAIR,
     LOG_LEVEL, LOG_FILE, DEBUG_MODE, DRY_RUN_MODE, CAPITAL_ALLOCATION,
-    CONSOLE_ALERTS_ENABLED, TELEGRAM_ALERTS_ENABLED
+    CONSOLE_ALERTS_ENABLED, TELEGRAM_ALERTS_ENABLED, MINUTE_STATUS_UPDATES_ENABLED
 )
 from strategy_manager import StrategyManager
 from telegram_bot import TelegramBot
@@ -164,13 +164,14 @@ class EnhancedTradingAlertBot:
             )
             
             # Add minute-by-minute status update for testing
-            self.scheduler.add_job(
-                self._minute_status_update,
-                IntervalTrigger(minutes=1),
-                id='minute_status',
-                name='Minute Status Update',
-                max_instances=1
-            )
+            if MINUTE_STATUS_UPDATES_ENABLED:
+                self.scheduler.add_job(
+                    self._minute_status_update,
+                    IntervalTrigger(minutes=1),
+                    id='minute_status',
+                    name='Minute Status Update',
+                    max_instances=1
+                )
             
             logger.info("Scheduler setup completed")
             
@@ -520,13 +521,18 @@ class EnhancedTradingAlertBot:
             else:
                 startup_msg += "📱 <b>TELEGRAM ALERTS: DISABLED</b>\n"
                 
+            if MINUTE_STATUS_UPDATES_ENABLED:
+                startup_msg += "⏰ MINUTE STATUS UPDATES: ACTIVE (for testing)\n"
+            else:
+                startup_msg += "⏰ MINUTE STATUS UPDATES: DISABLED\n"
+                
             if CONSOLE_ALERTS_ENABLED:
                 startup_msg += "💻 CONSOLE ALERTS: ENABLED\n"
             else:
                 startup_msg += "💻 CONSOLE ALERTS: DISABLED\n"
                 
             if DEBUG_MODE:
-                startup_msg += "�� DEBUG MODE: ENABLED (for testing)\n"
+                startup_msg += "🔍 DEBUG MODE: ENABLED (for testing)\n"
             else:
                 startup_msg += "🔍 DEBUG MODE: DISABLED\n"
                 
@@ -547,7 +553,10 @@ class EnhancedTradingAlertBot:
                     telegram_startup += "Risk management and position sizing are active.\n"
                     telegram_startup += f"Monitoring {len(TRADING_PAIRS)} trading pairs.\n\n"
                     telegram_startup += "📱 <b>TELEGRAM ALERTS: ENABLED</b>\n"
-                    telegram_startup += "⏰ <b>MINUTE STATUS UPDATES: ACTIVE</b> (for testing)\n"
+                    if MINUTE_STATUS_UPDATES_ENABLED:
+                        telegram_startup += "⏰ <b>MINUTE STATUS UPDATES: ACTIVE</b> (for testing)\n"
+                    else:
+                        telegram_startup += "⏰ <b>MINUTE STATUS UPDATES: DISABLED</b>\n"
                     telegram_startup += "🔒 <b>DRY RUN MODE: ENABLED</b> (safe testing)"
                     
                     self.telegram_bot.send_message(telegram_startup)

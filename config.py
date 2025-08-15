@@ -26,6 +26,9 @@ TELEGRAM_PARSE_MODE = 'HTML'  # HTML, Markdown, or None
 TELEGRAM_DISABLE_WEB_PAGE_PREVIEW = True
 TELEGRAM_DISABLE_NOTIFICATION = False
 
+# Status update settings
+MINUTE_STATUS_UPDATES_ENABLED = False  # Set to False to disable minute-by-minute updates
+
 # =============================================================================
 # EXCHANGE CONFIGURATION
 # =============================================================================
