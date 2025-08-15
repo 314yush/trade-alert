@@ -197,8 +197,11 @@ BACKTEST_CONFIG = {
 }
 
 # =============================================================================
-# ALERT SETTINGS
+# ALERT CONFIGURATION
 # =============================================================================
+# Console Output Configuration
+CONSOLE_ALERTS_ENABLED = True  # Always enabled for local monitoring
+
 # Maximum number of alerts per day per strategy to prevent spam
 MAX_ALERTS_PER_DAY = 10
 
@@ -239,10 +242,10 @@ DEBUG_MODE = False
 DRY_RUN_MODE = True
 
 # Enable test mode (runs without Telegram, uses console output)
-TEST_MODE = True
+TEST_MODE = False
 
 # Skip Telegram initialization in test mode
-SKIP_TELEGRAM_IN_TEST = True
+SKIP_TELEGRAM_IN_TEST = False
 
 # =============================================================================
 # LEGACY PARAMETERS (for backward compatibility)
