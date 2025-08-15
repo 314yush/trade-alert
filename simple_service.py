@@ -79,7 +79,7 @@ def test():
     })
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
+    port = int(os.environ.get('PORT', 10000))  # Render default port
     logger.info(f"Starting simple service on port {port}")
     logger.info("Available endpoints:")
     logger.info("  - / (home)")
