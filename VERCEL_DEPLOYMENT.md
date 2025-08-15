@@ -2,7 +2,24 @@
 
 ## 🎯 **Deploy Your Trading Bot on Vercel in 5 Minutes!**
 
-Since you're already familiar with Vercel, this will be super easy. Your trading bot is now configured specifically for Vercel's serverless platform.
+Since you're already familiar with Vercel, this will be super easy. Your trading bot is now configured specifically for Vercel's serverless platform with **Telegram remote control capabilities**.
+
+## 🤖 **New Feature: Telegram Remote Control!**
+
+Your bot now includes **Telegram bot control** that allows you to:
+- **Start/Stop** the trading bot via Telegram commands
+- **Check status** remotely from anywhere
+- **Restart** the bot without accessing the server
+- **Monitor** bot performance in real-time
+
+### **Available Telegram Commands:**
+- `/start` - Start the trading bot
+- `/stop` - Stop the trading bot  
+- `/restart` - Restart the trading bot
+- `/status` - Check current bot status
+- `/help` - Show available commands
+- `/ping` - Test controller responsiveness
+- `/info` - Get bot information
 
 ## 📊 **Vercel Free Tier - Perfect for Your Bot**
 
@@ -131,6 +148,23 @@ curl https://your-app.vercel.app/test
 3. **View deployment history**
 4. **Check real-time logs**
 
+## 🤖 **Using Telegram Control After Deployment**
+
+### **1. Start Your Bot:**
+Send `/start` to your Telegram bot to begin trading operations.
+
+### **2. Check Status:**
+Send `/status` to get real-time bot status and performance metrics.
+
+### **3. Stop Your Bot:**
+Send `/stop` to halt trading operations safely.
+
+### **4. Restart:**
+Send `/restart` to restart the bot if needed.
+
+### **5. Get Help:**
+Send `/help` to see all available commands.
+
 ## 💰 **Cost Breakdown**
 
 ### **Free Tier (What You Get)**
@@ -182,6 +216,7 @@ Your deployment is successful when:
 - [ ] Health check shows "healthy" status
 - [ ] Service is accessible via the generated URL
 - [ ] No critical errors in deployment logs
+- [ ] Telegram bot responds to commands
 
 ---
 
