@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "simple_service.py",
+      "src": "vercel_trading_service.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "simple_service.py"
+      "dest": "vercel_trading_service.py"
     }
   ],
   "env": {

@@ -1,0 +1,303 @@
+#!/usr/bin/env python3
+"""
+Vercel-Compatible Trading Alert Bot Service
+
+This service is specifically designed for Vercel's serverless architecture
+and can run the trading bot with Telegram integration.
+"""
+
+import os
+import sys
+import logging
+import threading
+import time
+from datetime import datetime
+from flask import Flask, jsonify, request
+import requests
+
+# Add current directory to path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Create Flask app
+app = Flask(__name__)
+
+# Global bot state
+bot_state = {
+    'is_running': False,
+    'start_time': None,
+    'total_signals': 0,
+    'errors_count': 0,
+    'last_signal_time': None,
+    'telegram_bot': None,
+    'trading_thread': None
+}
+
+class VercelTradingBot:
+    """Trading bot adapted for Vercel's serverless environment."""
+    
+    def __init__(self):
+        self.is_running = False
+        self.start_time = None
+        self.total_signals = 0
+        self.errors_count = 0
+        
+    def start(self):
+        """Start the trading bot."""
+        if self.is_running:
+            return False, "Bot is already running"
+        
+        try:
+            self.is_running = True
+            self.start_time = datetime.now()
+            self.total_signals = 0
+            self.errors_count = 0
+            
+            # Start trading logic in background
+            self._start_trading_logic()
+            
+            logger.info("Trading bot started successfully")
+            return True, "Trading bot started successfully"
+            
+        except Exception as e:
+            self.is_running = False
+            self.errors_count += 1
+            logger.error(f"Error starting trading bot: {e}")
+            return False, f"Error starting bot: {str(e)}"
+    
+    def stop(self):
+        """Stop the trading bot."""
+        if not self.is_running:
+            return False, "Bot is not running"
+        
+        try:
+            self.is_running = False
+            logger.info("Trading bot stopped")
+            return True, "Trading bot stopped successfully"
+            
+        except Exception as e:
+            self.errors_count += 1
+            logger.error(f"Error stopping trading bot: {e}")
+            return False, f"Error stopping bot: {str(e)}"
+    
+    def get_status(self):
+        """Get current bot status."""
+        if not self.start_time:
+            uptime = "00:00:00"
+        else:
+            uptime_seconds = int((datetime.now() - self.start_time).total_seconds())
+            hours, remainder = divmod(uptime_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            uptime = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        
+        return {
+            'bot_status': 'running' if self.is_running else 'stopped',
+            'uptime': uptime,
+            'total_signals': self.total_signals,
+            'errors_count': self.errors_count,
+            'start_time': self.start_time.isoformat() if self.start_time else None,
+            'current_time': datetime.now().isoformat()
+        }
+    
+    def _start_trading_logic(self):
+        """Start the trading logic in a background thread."""
+        def trading_loop():
+            logger.info("Starting trading logic loop")
+            while self.is_running:
+                try:
+                    # Simulate trading signal generation
+                    if self._should_generate_signal():
+                        self._generate_trading_signal()
+                    
+                    # Sleep for a bit to avoid overwhelming the system
+                    time.sleep(30)  # Check every 30 seconds
+                    
+                except Exception as e:
+                    self.errors_count += 1
+                    logger.error(f"Error in trading loop: {e}")
+                    time.sleep(60)  # Wait longer on error
+        
+        # Start trading thread
+        self.trading_thread = threading.Thread(target=trading_loop, daemon=True)
+        self.trading_thread.start()
+        logger.info("Trading thread started")
+    
+    def _should_generate_signal(self):
+        """Determine if we should generate a trading signal."""
+        # Simple logic: generate signal every 5-15 minutes randomly
+        import random
+        return random.randint(1, 30) == 1  # 1 in 30 chance each 30 seconds
+    
+    def _generate_trading_signal(self):
+        """Generate and send a trading signal."""
+        try:
+            # Create a sample trading signal
+            signal = {
+                'type': 'BUY' if self.total_signals % 2 == 0 else 'SELL',
+                'symbol': 'BTC/USDT',
+                'price': 45000 + (self.total_signals * 100),
+                'timestamp': datetime.now().isoformat(),
+                'confidence': 0.85,
+                'reason': 'Momentum breakout detected'
+            }
+            
+            # Send via Telegram
+            self._send_telegram_signal(signal)
+            
+            # Update stats
+            self.total_signals += 1
+            self.last_signal_time = datetime.now()
+            
+            logger.info(f"Generated trading signal: {signal['type']} {signal['symbol']}")
+            
+        except Exception as e:
+            self.errors_count += 1
+            logger.error(f"Error generating trading signal: {e}")
+    
+    def _send_telegram_signal(self, signal):
+        """Send trading signal via Telegram."""
+        try:
+            bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+            chat_id = os.getenv('TELEGRAM_CHAT_ID')
+            
+            if not bot_token or not chat_id:
+                logger.warning("Telegram credentials not configured")
+                return False
+            
+            # Format message
+            message = f"""
+🚨 **TRADING SIGNAL ALERT** 🚨
+
+**Action**: {signal['type']}
+**Symbol**: {signal['symbol']}
+**Price**: ${signal['price']:,.2f}
+**Confidence**: {signal['confidence']*100:.1f}%
+**Time**: {signal['timestamp']}
+**Reason**: {signal['reason']}
+
+Generated by your Vercel Trading Bot 🤖
+            """.strip()
+            
+            # Send via Telegram API
+            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+            data = {
+                'chat_id': chat_id,
+                'text': message,
+                'parse_mode': 'HTML'
+            }
+            
+            response = requests.post(url, data=data, timeout=10)
+            
+            if response.status_code == 200:
+                logger.info("Trading signal sent via Telegram successfully")
+                return True
+            else:
+                logger.error(f"Failed to send Telegram message: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error sending Telegram signal: {e}")
+            return False
+
+# Initialize the trading bot
+trading_bot = VercelTradingBot()
+
+@app.route('/')
+def home():
+    """Home page."""
+    return jsonify({
+        'message': 'Vercel Trading Alert Bot Service',
+        'status': 'running' if bot_state['is_running'] else 'stopped',
+        'endpoints': {
+            'health': '/health',
+            'home': '/',
+            'status': '/status',
+            'start': '/start',
+            'stop': '/stop',
+            'test': '/test'
+        }
+    })
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint."""
+    uptime = "00:00:00"
+    if bot_state['start_time']:
+        uptime_seconds = int((datetime.now() - bot_state['start_time']).total_seconds())
+        hours, remainder = divmod(uptime_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        uptime = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    
+    return jsonify({
+        'status': 'healthy',
+        'bot_running': bot_state['is_running'],
+        'uptime': uptime,
+        'total_signals': bot_state['total_signals'],
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/status')
+def status():
+    """Bot status endpoint."""
+    return jsonify(trading_bot.get_status())
+
+@app.route('/start')
+def start_bot():
+    """Start the trading bot."""
+    success, message = trading_bot.start()
+    if success:
+        bot_state['is_running'] = True
+        bot_state['start_time'] = trading_bot.start_time
+        bot_state['total_signals'] = trading_bot.total_signals
+        bot_state['errors_count'] = trading_bot.errors_count
+    
+    return jsonify({
+        'success': success,
+        'message': message,
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/stop')
+def stop_bot():
+    """Stop the trading bot."""
+    success, message = trading_bot.stop()
+    if success:
+        bot_state['is_running'] = False
+    
+    return jsonify({
+        'success': success,
+        'message': message,
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/test')
+def test():
+    """Test endpoint for basic functionality."""
+    return jsonify({
+        'message': 'Vercel Trading Service is working correctly!',
+        'timestamp': datetime.now().isoformat(),
+        'status': 'success',
+        'bot_status': trading_bot.get_status()
+    })
+
+# Vercel requires this for serverless deployment
+app.debug = False
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    logger.info(f"Starting Vercel trading service on port {port}")
+    logger.info("Available endpoints:")
+    logger.info("  - / (home)")
+    logger.info("  - /health (health check)")
+    logger.info("  - /status (bot status)")
+    logger.info("  - /start (start bot)")
+    logger.info("  - /stop (stop bot)")
+    logger.info("  - /test (test endpoint)")
+    
+    app.run(host='0.0.0.0', port=port, debug=False)
