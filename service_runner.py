@@ -39,7 +39,7 @@ bot_thread = None
 @app.route('/health')
 def health_check():
     """Health check endpoint for hosting platforms."""
-    if bot and bot.is_running:
+    if bot and hasattr(bot, 'is_running') and bot.is_running:
         return jsonify({
             'status': 'healthy',
             'bot_running': True,
@@ -68,39 +68,27 @@ def run_bot():
     """Run the bot in a separate thread."""
     global bot
     try:
+        logger.info("Initializing trading bot...")
         bot = EnhancedTradingAlertBot()
+        
+        logger.info("Starting trading bot...")
         bot.start()
         
+        logger.info("Trading bot started successfully")
+        
         # Keep the bot running
-        while bot.is_running:
+        while hasattr(bot, 'is_running') and bot.is_running:
             time.sleep(1)
             
     except Exception as e:
         logger.error(f"Bot error: {e}")
         bot = None
 
-def signal_handler(signum, frame):
-    """Handle shutdown signals gracefully."""
-    logger.info(f"Received signal {signum}, shutting down gracefully...")
-    
-    global bot, bot_thread
-    
-    if bot:
-        bot.stop()
-    
-    if bot_thread and bot_thread.is_alive():
-        bot_thread.join(timeout=10)
-    
-    logger.info("Shutdown complete")
-    sys.exit(0)
-
 def main():
     """Main service entry point."""
     global bot_thread
     
-    # Set up signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    logger.info("Starting Trading Alert Bot Service...")
     
     # Start bot in background thread
     bot_thread = Thread(target=run_bot, daemon=True)
@@ -111,9 +99,21 @@ def main():
     
     logger.info(f"Starting service on port {port}")
     logger.info("Bot is starting in background...")
+    logger.info("Service will be available at:")
+    logger.info(f"  - Home: http://localhost:{port}/")
+    logger.info(f"  - Health: http://localhost:{port}/health")
     
     # Run Flask app
-    app.run(host='0.0.0.0', port=port, debug=False)
+    try:
+        app.run(host='0.0.0.0', port=port, debug=False)
+    except KeyboardInterrupt:
+        logger.info("Received interrupt signal, shutting down...")
+        if bot:
+            try:
+                bot.stop()
+            except:
+                pass
+        logger.info("Service shutdown complete")
 
 if __name__ == '__main__':
     main()

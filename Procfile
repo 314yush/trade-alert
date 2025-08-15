@@ -1,1 +1,1 @@
-web: python service_runner.py
+web: python simple_service.py
